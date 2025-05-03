@@ -7,6 +7,8 @@ services:
         USER_GID: ${USER_GID}
         TIMEZONE: ${TIMEZONE}
     container_name: php-fpm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./app:/var/www
       - ./docker/php-fpm/logs/:/var/log

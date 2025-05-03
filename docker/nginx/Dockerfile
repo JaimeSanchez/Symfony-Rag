@@ -1,7 +1,7 @@
 ARG UID=1000
 ARG GID=1000
 
-FROM nginx:latest
+FROM nginx:1.24
 
 ADD nginx.conf /etc/nginx/
 

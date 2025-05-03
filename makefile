@@ -1,6 +1,6 @@
 # Variables
 DOCKER = docker
-DOCKER_COMPOSE = docker compose
+DOCKER_COMPOSE = docker-compose
 PHP_FPM_CONTAINER = php-fpm
 NGINX_CONTAINER = nginx
 EXEC = $(DOCKER) exec -it $(PHP_FPM_CONTAINER)
