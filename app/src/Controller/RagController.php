@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Factory\ElasticSearchClientFactory;
+use App\Factory\NomicEmbedTextConfigFactory;
 use App\Factory\OllamaConfigFactory;
 use App\Form\QuestionFormType;
 use Exception;
@@ -20,10 +21,12 @@ final class RagController extends AbstractController
 {
     private ElasticSearchClientFactory $esClientFactory;
     private OllamaConfigFactory $ollamaConfigFactory;
+    private NomicEmbedTextConfigFactory $nomicEmbedTextConfigFactory;
 
-    public function __construct(ElasticSearchClientFactory $esClientFactory, OllamaConfigFactory $ollamaConfigFactory)
+    public function __construct(ElasticSearchClientFactory $esClientFactory, OllamaConfigFactory $ollamaConfigFactory, NomicEmbedTextConfigFactory $nomicEmbedTextConfigFactory)
     {
         $this->esClientFactory = $esClientFactory;
+        $this->nomicEmbedTextConfigFactory = $nomicEmbedTextConfigFactory;
         $this->ollamaConfigFactory = $ollamaConfigFactory;
     }
 

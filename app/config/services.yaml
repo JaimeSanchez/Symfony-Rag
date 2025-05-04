@@ -37,4 +37,10 @@ services:
             $ollamaPort: '%ollama_port%'
             $ollamaModel: '%ollama_model%'
 
+    App\Factory\NomicEmbedTextConfigFactory:
+        arguments:
+            $ollamaHost: '%ollama_host%'
+            $ollamaPort: '%ollama_port%'
+            $ollamaModel: '%ollama_model%'
+
 

@@ -57,7 +57,7 @@ class GenerateEmbeddingsCommand extends Command
         foreach ($documents as $item) {
             $newDocument = new  Document();
             $data = json_encode($item);
-            if (false != $data) {
+            if ($data) {
                 $newDocument->id = $item['id'];
                 $newDocument->content = $this->formatEmbeddingContent($item);
                 $newDocument->hash = hash('sha256', $data);
