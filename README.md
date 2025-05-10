@@ -153,3 +153,5 @@ I welcome feedback, suggestions, and contributions to help improve this project!
 ### Guidelines:
 - Provide as much detail as possible to help us understand your request.
 - Be respectful and constructive in your communication.
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/JaimeSanchez/Symfony-Rag)
