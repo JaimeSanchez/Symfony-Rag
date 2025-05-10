@@ -1,3 +1,5 @@
+version: '3.9'
+
 services:
   php-fpm:
     build:
@@ -20,6 +22,7 @@ services:
       retries: 3
       start_period: 5s
       timeout: 10s
+    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
@@ -31,9 +34,17 @@ services:
       - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./docker/nginx/logs/:/var/log/nginx
     depends_on:
-      - php-fpm
+      php-fpm:
+        condition: service_healthy
     networks:
       - symfony
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.16.4
@@ -51,6 +62,20 @@ services:
       - cluster.routing.allocation.disk.watermark.flood_stage=2gb
     networks:
       - symfony
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200 >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.5.0
@@ -58,52 +83,151 @@ services:
     ports:
       - "5601:5601"
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - symfony
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5601/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
 
-#  ollama:
-#    image: ollama/ollama:0.5.13-rocm
-#    ports:
-#      - "11434:11434"
-#    devices:
-#      - "/dev/kfd"
-#      - "/dev/dri"
-#    group_add:
-#      - "video"
-#    depends_on:
-#      - php-fpm
-#    environment:
-#      - ROC_ENABLE=1
-#      - HSA_OVERRIDE_GFX_VERSION=10.3.0
-#      - LD_LIBRARY_PATH=/opt/rocm/lib
-#    volumes:
-#      - open-webui-local:/app/backend/data
-#    networks:
-#      - symfony
-#
-#
-#  openWebUI:
-#    image: ghcr.io/open-webui/open-webui:main
-#    restart: always
-#    ports:
-#      - "3000:8080"
-#    security_opt:
-#      - seccomp:unconfined
-#    cap_add:
-#        - SYS_PTRACE
-#    ipc: host
-#    extra_hosts:
-#      - "host.docker.internal:host-gateway"
-#    volumes:
-#      - open-webui-local:/app/backend/data
-#    networks:
-#      - symfony
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11435:11434"
+    depends_on:
+      - php-fpm
+    volumes:
+      - open-webui-local:/app/backend/data
+    networks:
+      - symfony
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  openWebUI:
+    image: ghcr.io/open-webui/open-webui:main
+    restart: always
+    ports:
+      - "3000:8080"
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_PTRACE
+    ipc: host
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - open-webui-local:/app/backend/data
+    networks:
+      - symfony
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  vector-service:
+    build:
+      context: ./vector-service
+    volumes:
+      - ./vector-service/chroma_db:/app/chroma_db
+    ports:
+      - "8001:8000"
+    environment:
+      - LITELLM_URL=http://litellm:4000
+    networks:
+      - symfony
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  zipkin:
+    image: openzipkin/zipkin:2.23
+    ports:
+      - "9411:9411"
+    depends_on:
+      - otel-collector
+    networks:
+      - symfony
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9411/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ${PWD}/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8888:8888"
+      - "13133:13133"
+    networks:
+      - symfony
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:13133"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  chroma:
+    image: chromadb/chroma:0.6.3
+    container_name: chroma
+    volumes:
+      - chroma_data:/data
+    ports:
+      - "8002:8000"
+    networks:
+      - symfony
+    environment:
+      - CHROMA_OPEN_TELEMETRY__ENDPOINT=http://otel-collector:4317/
+      - CHROMA_OPEN_TELEMETRY__SERVICE_NAME=chroma
+      - ALLOW_RESET=true
+      - ANONYMIZED_TELEMETRY=false
+    depends_on:
+      otel-collector:
+        condition: service_healthy
+      zipkin:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
 
 volumes:
   open-webui-local:
   ollama-local:
+  chroma_data:
+    driver: local
 
 networks:
   symfony:
     driver: bridge
+    
